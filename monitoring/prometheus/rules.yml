@@ -1,0 +1,50 @@
+groups:
+  - name: airflow_recording_rules
+    interval: 30s
+    rules:
+      # Success rate by DAG
+      - record: dag:success_rate:5m
+        expr: |
+          sum(rate(airflow_dag_run_success[5m])) by (dag_id)
+          /
+          sum(rate(airflow_dag_run_total[5m])) by (dag_id)
+
+      # Average task duration by DAG
+      - record: dag:task_duration_avg:5m
+        expr: |
+          avg(rate(airflow_task_duration_seconds[5m])) by (dag_id)
+
+      # Task failure rate
+      - record: task:failure_rate:5m
+        expr: |
+          sum(rate(airflow_task_failed[5m])) by (task_id, dag_id)
+          /
+          sum(rate(airflow_task_total[5m])) by (task_id, dag_id)
+
+  - name: pipeline_performance_rules
+    interval: 30s
+    rules:
+      # Pipeline throughput (rows per second)
+      - record: pipeline:throughput:5m
+        expr: |
+          sum(rate(pipeline_rows_processed_total[5m])) by (pipeline)
+
+      # Average pipeline duration
+      - record: pipeline:duration_avg:5m
+        expr: |
+          avg(pipeline_duration_seconds) by (pipeline)
+
+  - name: data_quality_rules
+    interval: 30s
+    rules:
+      # Overall quality score
+      - record: data_quality:overall_score:5m
+        expr: |
+          avg(data_quality_score) by (dataset)
+
+      # Quality test pass rate
+      - record: data_quality:test_pass_rate:5m
+        expr: |
+          sum(rate(data_quality_tests_passed[5m])) by (dataset)
+          /
+          sum(rate(data_quality_tests_total[5m])) by (dataset)

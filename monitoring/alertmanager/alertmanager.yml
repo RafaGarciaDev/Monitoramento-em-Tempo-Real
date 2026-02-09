@@ -1,0 +1,123 @@
+global:
+  resolve_timeout: 5m
+  # Slack API URL (configure com sua webhook URL)
+  slack_api_url: 'YOUR_SLACK_WEBHOOK_URL'
+
+# Templates para notificações
+templates:
+  - '/etc/alertmanager/*.tmpl'
+
+# Roteamento de alertas
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default'
+  
+  routes:
+    # Alertas críticos
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      continue: true
+    
+    # Alertas de qualidade de dados
+    - match:
+        component: data-quality
+      receiver: 'data-quality-team'
+    
+    # Alertas de performance
+    - match:
+        component: performance
+      receiver: 'sre-team'
+    
+    # Alertas do Airflow
+    - match:
+        component: airflow
+      receiver: 'data-engineering'
+
+# Inibição de alertas
+inhibit_rules:
+  # Se o scheduler está down, não alertar sobre outras falhas
+  - source_match:
+      alertname: 'SchedulerDown'
+    target_match:
+      component: 'airflow'
+    equal: ['cluster']
+
+# Receivers (configure com suas credenciais)
+receivers:
+  # Default receiver
+  - name: 'default'
+    email_configs:
+      - to: 'team@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'smtp.gmail.com:587'
+        auth_username: 'your-email@gmail.com'
+        auth_password: 'your-app-password'
+        headers:
+          Subject: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+
+  # Alertas críticos - Slack + Email + PagerDuty
+  - name: 'critical-alerts'
+    slack_configs:
+      - channel: '#critical-alerts'
+        title: '🚨 CRITICAL ALERT'
+        text: |
+          *Alert:* {{ .GroupLabels.alertname }}
+          *Severity:* {{ .CommonLabels.severity }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+        send_resolved: true
+    
+    email_configs:
+      - to: 'oncall@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'smtp.gmail.com:587'
+        headers:
+          Subject: '🚨 [CRITICAL] {{ .GroupLabels.alertname }}'
+    
+    # PagerDuty (configure com sua integration key)
+    # pagerduty_configs:
+    #   - service_key: 'YOUR_PAGERDUTY_KEY'
+    #     description: '{{ .CommonAnnotations.summary }}'
+
+  # Data Quality Team
+  - name: 'data-quality-team'
+    slack_configs:
+      - channel: '#data-quality'
+        title: '📊 Data Quality Alert'
+        text: |
+          *Alert:* {{ .GroupLabels.alertname }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+        send_resolved: true
+
+  # SRE Team
+  - name: 'sre-team'
+    slack_configs:
+      - channel: '#sre-alerts'
+        title: '⚡ Performance Alert'
+        text: |
+          *Alert:* {{ .GroupLabels.alertname }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+        send_resolved: true
+
+  # Data Engineering Team
+  - name: 'data-engineering'
+    slack_configs:
+      - channel: '#data-engineering'
+        title: '🔧 Pipeline Alert'
+        text: |
+          *Alert:* {{ .GroupLabels.alertname }}
+          *DAG:* {{ .CommonLabels.dag_id }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+        send_resolved: true
+    
+    email_configs:
+      - to: 'data-eng@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'smtp.gmail.com:587'

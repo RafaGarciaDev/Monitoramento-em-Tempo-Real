@@ -1,0 +1,166 @@
+groups:
+  - name: airflow_alerts
+    interval: 30s
+    rules:
+      # DAG Failure Alert
+      - alert: DAGFailed
+        expr: increase(airflow_dag_run_failed[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: airflow
+        annotations:
+          summary: "DAG execution failed"
+          description: "DAG {{ $labels.dag_id }} has failed in the last 5 minutes"
+
+      # Task Failure Alert
+      - alert: TaskFailed
+        expr: increase(airflow_task_failed[5m]) > 3
+        for: 2m
+        labels:
+          severity: warning
+          component: airflow
+        annotations:
+          summary: "Multiple task failures detected"
+          description: "More than 3 tasks failed in the last 5 minutes"
+
+      # SLA Miss Alert
+      - alert: SLAMissed
+        expr: increase(airflow_sla_missed[10m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: airflow
+        annotations:
+          summary: "SLA violation detected"
+          description: "DAG {{ $labels.dag_id }} missed SLA"
+
+      # Scheduler Heartbeat
+      - alert: SchedulerDown
+        expr: time() - airflow_scheduler_heartbeat > 60
+        for: 2m
+        labels:
+          severity: critical
+          component: airflow
+        annotations:
+          summary: "Airflow scheduler is down"
+          description: "No scheduler heartbeat for more than 2 minutes"
+
+      # Long Running Tasks
+      - alert: TaskRunningTooLong
+        expr: airflow_task_duration_seconds > 3600
+        for: 5m
+        labels:
+          severity: warning
+          component: airflow
+        annotations:
+          summary: "Task running longer than expected"
+          description: "Task {{ $labels.task_id }} in DAG {{ $labels.dag_id }} running for more than 1 hour"
+
+      # High Task Queue
+      - alert: HighTaskQueue
+        expr: airflow_executor_queued_tasks > 50
+        for: 10m
+        labels:
+          severity: warning
+          component: airflow
+        annotations:
+          summary: "High number of queued tasks"
+          description: "More than 50 tasks queued for execution"
+
+  - name: data_quality_alerts
+    interval: 30s
+    rules:
+      # Data Quality Score Low
+      - alert: LowDataQualityScore
+        expr: data_quality_score < 0.90
+        for: 5m
+        labels:
+          severity: warning
+          component: data-quality
+        annotations:
+          summary: "Data quality score below threshold"
+          description: "Data quality score is {{ $value | humanize }}%, below 90% threshold"
+
+      # High Data Completeness Issues
+      - alert: DataCompletenessIssue
+        expr: data_completeness_ratio < 0.95
+        for: 5m
+        labels:
+          severity: warning
+          component: data-quality
+        annotations:
+          summary: "Data completeness issues detected"
+          description: "Data completeness is {{ $value | humanizePercentage }}"
+
+      # Data Freshness
+      - alert: StaleData
+        expr: data_freshness_seconds > 7200
+        for: 10m
+        labels:
+          severity: warning
+          component: data-quality
+        annotations:
+          summary: "Data is stale"
+          description: "Data hasn't been updated in {{ $value | humanizeDuration }}"
+
+  - name: performance_alerts
+    interval: 30s
+    rules:
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: pipeline_cpu_usage_percent > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "High CPU usage detected"
+          description: "Pipeline {{ $labels.pipeline }} CPU usage is {{ $value }}%"
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: pipeline_memory_usage_bytes / 1024 / 1024 / 1024 > 4
+        for: 10m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "High memory usage detected"
+          description: "Pipeline {{ $labels.pipeline }} using {{ $value | humanize }}GB memory"
+
+      # Slow Pipeline Execution
+      - alert: SlowPipeline
+        expr: rate(pipeline_duration_seconds[10m]) > 7200
+        for: 5m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "Pipeline execution is slow"
+          description: "Pipeline {{ $labels.pipeline }} taking longer than expected"
+
+  - name: system_alerts
+    interval: 30s
+    rules:
+      # Database Connection Pool
+      - alert: DatabaseConnectionsHigh
+        expr: database_connections_active > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High number of database connections"
+          description: "{{ $value }} active database connections"
+
+      # Redis Memory
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.80
+        for: 10m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis using {{ $value | humanizePercentage }} of available memory"
